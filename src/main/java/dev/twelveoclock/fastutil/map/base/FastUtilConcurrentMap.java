@@ -27,7 +27,7 @@ public abstract class FastUtilConcurrentMap {
 
 
 	protected int getBucket(final int hashCode) {
-		return hashCode % numBuckets;
+		return Math.floorMod(hashCode, numBuckets);
 	}
 
 }

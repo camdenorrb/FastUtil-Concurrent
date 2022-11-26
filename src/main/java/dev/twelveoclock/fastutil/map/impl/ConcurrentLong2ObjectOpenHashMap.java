@@ -1,46 +1,63 @@
 package dev.twelveoclock.fastutil.map.impl;
 
 import dev.twelveoclock.fastutil.map.base.FastUtilConcurrentMap;
-import it.unimi.dsi.fastutil.ints.*;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import lombok.Getter;
-import lombok.NonNull;
 
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
+import static it.unimi.dsi.fastutil.Hash.DEFAULT_INITIAL_SIZE;
+import static it.unimi.dsi.fastutil.Hash.DEFAULT_LOAD_FACTOR;
 
-public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap implements Int2IntMap {
 
-	private final Int2IntMap[] buckets;
+public final class ConcurrentLong2ObjectOpenHashMap<V> extends FastUtilConcurrentMap implements Long2ObjectMap<V> {
+
+	private final Long2ObjectMap<V>[] buckets;
 
 	@Getter
-	private int defaultValue;
+	private V defaultValue;
 
 
-	public ConcurrentInt2IntOpenHashMap(final int numBuckets, final int defaultValue, final int loadCapacity, final float loadFactor) {
+	public ConcurrentLong2ObjectOpenHashMap() {
+		this(Runtime.getRuntime().availableProcessors() - 1, null, DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR);
+	}
+
+	public ConcurrentLong2ObjectOpenHashMap(final int numBuckets, final V defaultValue, final int loadCapacity, final float loadFactor) {
 
 		super(numBuckets);
 
-		this.buckets = new Int2IntMap[numBuckets];
+		//noinspection unchecked
+		this.buckets = new Long2ObjectMap[numBuckets];
 		this.defaultValue = defaultValue;
 
 		final int bucketLoadCapacity = (int) Math.ceil(((double) loadCapacity) / numBuckets);
 
 		for (int i = 0; i < numBuckets; i++) {
-			final Int2IntOpenHashMap bucket = new Int2IntOpenHashMap(bucketLoadCapacity, loadFactor);
-			bucket.defaultReturnValue(defaultValue);
+			final Long2ObjectMap<V> bucket = new Long2ObjectOpenHashMap<>(bucketLoadCapacity, loadFactor);
+			if (defaultValue != null) {
+				bucket.defaultReturnValue(defaultValue);
+			}
 			buckets[i] = bucket;
 		}
 	}
-
 
 	@Override
 	public int size() {
 
 		int size = 0;
 
-		for (final Int2IntMap bucket : buckets) {
+		for (final Long2ObjectMap<V> bucket : buckets) {
 			size += bucket.size();
 		}
 
@@ -50,7 +67,7 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	@Override
 	public boolean isEmpty() {
 
-		for (final Int2IntMap bucket : buckets) {
+		for (final Long2ObjectMap<V> bucket : buckets) {
 			if (!bucket.isEmpty()) {
 				return false;
 			}
@@ -60,10 +77,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public void putAll(final Map<? extends Integer, ? extends Integer> m) {
-		for (final Map.Entry<? extends Integer, ? extends Integer> entry : m.entrySet()) {
+	public void putAll(final Map<? extends Long, ? extends V> m) {
+		for (final Map.Entry<? extends Long, ? extends V> entry : m.entrySet()) {
 
-			final int bucket = getBucket(entry.getKey());
+			final int bucket = getBucket(entry.getKey().hashCode());
 			final Lock writeLock = locks[bucket].writeLock();
 
 			writeLock.lock();
@@ -76,9 +93,9 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public int put(final int key, final int value) {
+	public V put(final long key, final V value) {
 
-		final int bucket = getBucket(key);
+		final int bucket = getBucket(Long.hashCode(key));
 		final Lock writeLock = locks[bucket].writeLock();
 
 		writeLock.lock();
@@ -90,9 +107,9 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public int remove(final int key) {
+	public V remove(final long key) {
 
-		final int bucket = getBucket(key);
+		final int bucket = getBucket(Long.hashCode(key));
 		final Lock writeLock = locks[bucket].writeLock();
 
 		writeLock.lock();
@@ -104,28 +121,28 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public void defaultReturnValue(final int rv) {
+	public void defaultReturnValue(final V rv) {
 
 		this.defaultValue = rv;
 
-		for (final Int2IntMap bucket : buckets) {
+		for (final Long2ObjectMap<V> bucket : buckets) {
 			bucket.defaultReturnValue(rv);
 		}
 	}
 
 	@Override
-	public int defaultReturnValue() {
+	public V defaultReturnValue() {
 		return defaultValue;
 	}
 
 	@Override
-	public ObjectSet<Entry> int2IntEntrySet() {
+	public ObjectSet<Entry<V>> long2ObjectEntrySet() {
 
-		final Int2IntOpenHashMap map = new Int2IntOpenHashMap(size());
+		final Long2ObjectMap<V> map = new Long2ObjectOpenHashMap<>(size());
 
 		for (int i = 0; i < buckets.length; i++) {
 
-			final Int2IntMap bucket = buckets[i];
+			final Long2ObjectMap<V> bucket = buckets[i];
 			final Lock readLock = locks[i].readLock();
 
 			readLock.lock();
@@ -136,13 +153,13 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 			}
 		}
 
-		return map.int2IntEntrySet();
+		return map.long2ObjectEntrySet();
 	}
 
 	@Override
-	public IntSet keySet() {
+	public LongSet keySet() {
 
-		final IntOpenHashSet keySets = new IntOpenHashSet(buckets.length);
+		final LongSet keySets = new LongOpenHashSet(buckets.length);
 
 		for (int i = 0; i < buckets.length; i++) {
 
@@ -159,11 +176,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 		return keySets;
 	}
 
-	@NonNull
 	@Override
-	public IntCollection values() {
+	public ObjectCollection<V> values() {
 
-		final IntOpenHashSet values = new IntOpenHashSet();
+		final ObjectOpenHashSet<V> values = new ObjectOpenHashSet<>();
 
 		for (int i = 0; i < buckets.length; i++) {
 
@@ -181,10 +197,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public int get(final int key) {
+	public V get(final long key) {
 
-		final int bucketIndex = getBucket(key);
-		final Int2IntMap bucket = buckets[bucketIndex];
+		final int bucketIndex = getBucket(Long.hashCode(key));
+		final Long2ObjectMap<V> bucket = buckets[bucketIndex];
 		final Lock readLock = locks[bucketIndex].readLock();
 
 		readLock.lock();
@@ -196,10 +212,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public boolean containsKey(final int key) {
+	public boolean containsKey(final long key) {
 
-		final int bucketIndex = getBucket(key);
-		final Int2IntMap bucket = buckets[bucketIndex];
+		final int bucketIndex = getBucket(Long.hashCode(key));
+		final Long2ObjectMap<V> bucket = buckets[bucketIndex];
 		final Lock readLock = locks[bucketIndex].readLock();
 
 		readLock.lock();
@@ -211,11 +227,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public boolean containsValue(final int value) {
-
+	public boolean containsValue(final Object value) {
 		for (int i = 0; i < buckets.length; i++) {
 
-			final Int2IntMap bucket = buckets[i];
+			final Long2ObjectMap<V> bucket = buckets[i];
 			final Lock readLock = locks[i].readLock();
 
 			readLock.lock();
@@ -233,9 +248,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 
 	@Override
 	public void clear() {
+
 		for (int i = 0; i < buckets.length; i++) {
 
-			final Int2IntMap bucket = buckets[i];
+			final Long2ObjectMap<V> bucket = buckets[i];
 			final Lock writeLock = locks[i].writeLock();
 
 			writeLock.lock();
@@ -246,5 +262,4 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 			}
 		}
 	}
-
 }

@@ -239,4 +239,20 @@ public final class ConcurrentInt2ObjectOpenHashMap<V> extends FastUtilConcurrent
 		return false;
 	}
 
+	@Override
+	public void clear() {
+		for (int i = 0; i < buckets.length; i++) {
+
+			final Int2ObjectMap<V> bucket = buckets[i];
+			final Lock writeLock = locks[i].writeLock();
+
+			writeLock.lock();
+			try {
+				bucket.clear();
+			} finally {
+				writeLock.unlock();
+			}
+		}
+	}
+
 }

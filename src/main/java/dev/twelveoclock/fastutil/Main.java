@@ -2,12 +2,18 @@ package dev.twelveoclock.fastutil;
 
 import dev.twelveoclock.fastutil.set.impl.ConcurrentObjectOpenCustomHashSet;
 import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceLists;
 
 
 public class Main {
 
 	public static void main(final String[] args) {
 
+		//ReferenceLists.synchronize(new ReferenceArrayList<>());
+
+		System.out.println(Math.floorMod(-10, 19));
+		/*
 		final ConcurrentObjectOpenCustomHashSet<Integer> concurrentInt2IntMap = new ConcurrentObjectOpenCustomHashSet<>(new Hash.Strategy<>() {
 			@Override
 			public int hashCode(final Integer o) {
@@ -37,7 +43,7 @@ public class Main {
 			concurrentInt2IntMap.remove(i);
 		}
 
-		System.out.println("concurrentInt2IntMap.size() = " + concurrentInt2IntMap.size());
+		System.out.println("concurrentInt2IntMap.size() = " + concurrentInt2IntMap.size());*/
 	}
 
 }
