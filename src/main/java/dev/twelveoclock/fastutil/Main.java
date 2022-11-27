@@ -1,5 +1,6 @@
 package dev.twelveoclock.fastutil;
 
+import dev.twelveoclock.fastutil.map.impl.ConcurrentReference2IntOpenHashMap;
 import dev.twelveoclock.fastutil.set.impl.ConcurrentLongOpenHashSet;
 import dev.twelveoclock.fastutil.set.impl.ConcurrentObjectOpenCustomHashSet;
 import it.unimi.dsi.fastutil.Hash;
@@ -13,19 +14,16 @@ public class Main {
 
 		//ReferenceLists.synchronize(new ReferenceArrayList<>());
 
-		final ConcurrentLongOpenHashSet longs = new ConcurrentLongOpenHashSet();
+		final ConcurrentReference2IntOpenHashMap<String> map = new ConcurrentReference2IntOpenHashMap<>();
 
-		longs.add(1);
-		longs.add(2);
-		longs.add(3);
+		map.put("Hello", 1);
+		map.put("World", 2);
 
-		System.out.println(longs.size());
+		System.out.println(map.size());
 
-		longs.remove(1);
-		longs.remove(2);
-		longs.remove(3);
+		System.out.println(map.get("Hello"));
+		System.out.println(map.get("World"));
 
-		System.out.println(longs.size());
 		/*
 		final ConcurrentObjectOpenCustomHashSet<Integer> concurrentInt2IntMap = new ConcurrentObjectOpenCustomHashSet<>(new Hash.Strategy<>() {
 			@Override

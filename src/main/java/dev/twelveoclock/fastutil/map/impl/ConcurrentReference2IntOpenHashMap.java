@@ -2,7 +2,7 @@ package dev.twelveoclock.fastutil.map.impl;
 
 import dev.twelveoclock.fastutil.map.base.FastUtilConcurrentMap;
 import it.unimi.dsi.fastutil.ints.*;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.*;
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -13,29 +13,31 @@ import static it.unimi.dsi.fastutil.Hash.DEFAULT_INITIAL_SIZE;
 import static it.unimi.dsi.fastutil.Hash.DEFAULT_LOAD_FACTOR;
 
 
-public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap implements Int2IntMap {
+public final class ConcurrentReference2IntOpenHashMap<T> extends FastUtilConcurrentMap implements Reference2IntMap<T> {
 
-	private final Int2IntMap[] buckets;
+	private final Reference2IntLinkedOpenHashMap<T>[] buckets;
 
 	@Getter
 	private int defaultValue;
 
 
-	public ConcurrentInt2IntOpenHashMap() {
+
+	public ConcurrentReference2IntOpenHashMap() {
 		this(Runtime.getRuntime().availableProcessors() - 1, 0, DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR);
 	}
 
-	public ConcurrentInt2IntOpenHashMap(final int numBuckets, final int defaultValue, final int loadCapacity, final float loadFactor) {
+	public ConcurrentReference2IntOpenHashMap(final int numBuckets, final int defaultValue, final int loadCapacity, final float loadFactor) {
 
 		super(numBuckets);
 
-		this.buckets = new Int2IntMap[numBuckets];
+		//noinspection unchecked
+		this.buckets = new Reference2IntLinkedOpenHashMap[numBuckets];
 		this.defaultValue = defaultValue;
 
 		final int bucketLoadCapacity = (int) Math.ceil(((double) loadCapacity) / numBuckets);
 
 		for (int i = 0; i < numBuckets; i++) {
-			final Int2IntOpenHashMap bucket = new Int2IntOpenHashMap(bucketLoadCapacity, loadFactor);
+			final Reference2IntLinkedOpenHashMap<T> bucket = new Reference2IntLinkedOpenHashMap<>(bucketLoadCapacity, loadFactor);
 			if (defaultValue != 0) {
 				bucket.defaultReturnValue(defaultValue);
 			}
@@ -49,7 +51,7 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 
 		int size = 0;
 
-		for (final Int2IntMap bucket : buckets) {
+		for (final Reference2IntMap<T> bucket : buckets) {
 			size += bucket.size();
 		}
 
@@ -59,7 +61,7 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	@Override
 	public boolean isEmpty() {
 
-		for (final Int2IntMap bucket : buckets) {
+		for (final Reference2IntMap<T> bucket : buckets) {
 			if (!bucket.isEmpty()) {
 				return false;
 			}
@@ -69,10 +71,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public void putAll(final Map<? extends Integer, ? extends Integer> m) {
-		for (final Map.Entry<? extends Integer, ? extends Integer> entry : m.entrySet()) {
+	public void putAll(final Map<? extends T, ? extends Integer> m) {
+		for (final Map.Entry<? extends T, ? extends Integer> entry : m.entrySet()) {
 
-			final int bucket = getBucket(entry.getKey());
+			final int bucket = getBucket(entry.getKey().hashCode());
 			final Lock writeLock = locks[bucket].writeLock();
 
 			writeLock.lock();
@@ -85,9 +87,9 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public int put(final int key, final int value) {
+	public int put(final T key, final int value) {
 
-		final int bucket = getBucket(key);
+		final int bucket = getBucket(key.hashCode());
 		final Lock writeLock = locks[bucket].writeLock();
 
 		writeLock.lock();
@@ -99,9 +101,24 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public int remove(final int key) {
+	public int getInt(final Object key) {
 
-		final int bucket = getBucket(key);
+		final int bucketIndex = getBucket(key.hashCode());
+		final Reference2IntMap<T> bucket = buckets[bucketIndex];
+		final Lock readLock = locks[bucketIndex].readLock();
+
+		readLock.lock();
+		try {
+			return bucket.getInt(key);
+		} finally {
+			readLock.unlock();
+		}
+	}
+
+	@Override
+	public Integer remove(final Object key) {
+
+		final int bucket = getBucket(key.hashCode());
 		final Lock writeLock = locks[bucket].writeLock();
 
 		writeLock.lock();
@@ -117,7 +134,7 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 
 		this.defaultValue = rv;
 
-		for (final Int2IntMap bucket : buckets) {
+		for (final Reference2IntMap<T> bucket : buckets) {
 			bucket.defaultReturnValue(rv);
 		}
 	}
@@ -128,13 +145,13 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public ObjectSet<Entry> int2IntEntrySet() {
+	public ObjectSet<Entry<T>> reference2IntEntrySet() {
 
-		final Int2IntOpenHashMap map = new Int2IntOpenHashMap(size());
+		final Reference2IntMap<T> map = new Reference2IntLinkedOpenHashMap<>(size());
 
 		for (int i = 0; i < buckets.length; i++) {
 
-			final Int2IntMap bucket = buckets[i];
+			final Reference2IntMap<T> bucket = buckets[i];
 			final Lock readLock = locks[i].readLock();
 
 			readLock.lock();
@@ -145,13 +162,13 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 			}
 		}
 
-		return map.int2IntEntrySet();
+		return map.reference2IntEntrySet();
 	}
 
 	@Override
-	public IntSet keySet() {
+	public ReferenceSet<T> keySet() {
 
-		final IntOpenHashSet keySets = new IntOpenHashSet(buckets.length);
+		final ReferenceOpenHashSet<T> keySets = new ReferenceOpenHashSet<>(buckets.length);
 
 		for (int i = 0; i < buckets.length; i++) {
 
@@ -190,25 +207,10 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	}
 
 	@Override
-	public int get(final int key) {
+	public boolean containsKey(final Object key) {
 
-		final int bucketIndex = getBucket(key);
-		final Int2IntMap bucket = buckets[bucketIndex];
-		final Lock readLock = locks[bucketIndex].readLock();
-
-		readLock.lock();
-		try {
-			return bucket.get(key);
-		} finally {
-			readLock.unlock();
-		}
-	}
-
-	@Override
-	public boolean containsKey(final int key) {
-
-		final int bucketIndex = getBucket(key);
-		final Int2IntMap bucket = buckets[bucketIndex];
+		final int bucketIndex = getBucket(key.hashCode());
+		final Reference2IntMap<T> bucket = buckets[bucketIndex];
 		final Lock readLock = locks[bucketIndex].readLock();
 
 		readLock.lock();
@@ -224,7 +226,7 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 
 		for (int i = 0; i < buckets.length; i++) {
 
-			final Int2IntMap bucket = buckets[i];
+			final Reference2IntMap<T> bucket = buckets[i];
 			final Lock readLock = locks[i].readLock();
 
 			readLock.lock();
@@ -244,7 +246,7 @@ public final class ConcurrentInt2IntOpenHashMap extends FastUtilConcurrentMap im
 	public void clear() {
 		for (int i = 0; i < buckets.length; i++) {
 
-			final Int2IntMap bucket = buckets[i];
+			final Reference2IntMap<T> bucket = buckets[i];
 			final Lock writeLock = locks[i].writeLock();
 
 			writeLock.lock();
