@@ -49,7 +49,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "dev.twelveoclock"
             artifactId = "fastutil-concurrent"
-            version = "1.0.5"
+            version = "1.0.6"
             from(components["java"])
         }
     }
